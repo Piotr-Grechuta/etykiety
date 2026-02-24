@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Tymczasowe obrazy kodow kreskowych tworzone przez skrypty
+barcode_*.png
+
+# Artefakty lokalne
+.DS_Store
+Thumbs.db
