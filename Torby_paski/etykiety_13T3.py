@@ -8,6 +8,7 @@ import glob
 import tkinter as tk
 from tkinter import filedialog
 from dbfread import DBF
+from embedded_backgrounds import get_background_reader, has_background
 
 # Parametry kodu kreskowego
 barcode_width = 60 * mm
@@ -205,8 +206,24 @@ def create_labels(data, kolory_df, rodzaje_df, rozmiary_df, output_pdf):
                 else:
                     background_image = os.path.join(script_dir, "1.png")
 
-                # Rysowanie tła
-                if os.path.exists(background_image):
+                # Rysowanie tla: najpierw wersja osadzona (bez zaleznosci od plikow PNG),
+                # potem fallback do pliku lokalnego.
+                background_drawn = False
+                template_name = os.path.basename(background_image)
+                if has_background(template_name):
+                    try:
+                        c.drawImage(
+                            get_background_reader(template_name),
+                            0,
+                            0,
+                            width=label_width,
+                            height=label_height,
+                        )
+                        background_drawn = True
+                    except Exception as e:
+                        print(f"Błąd podczas rysowania osadzonego tła {template_name}: {e}")
+
+                if not background_drawn and os.path.exists(background_image):
                     c.drawImage(background_image, 0, 0, width=label_width, height=label_height)
 
                 # Ekstrakcja i podział SKU z kolumny
