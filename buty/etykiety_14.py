@@ -1,0 +1,354 @@
+import os
+import pandas as pd
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import mm
+from barcode import EAN13
+from barcode.writer import ImageWriter
+import glob
+import tkinter as tk
+from tkinter import filedialog
+from tkinter.simpledialog import askstring
+from dbfread import DBF
+
+# Parametry kodu kreskowego
+barcode_width = 60 * mm
+barcode_height = 15 * mm
+barcode_x = 0 * mm  # Pozycja X kodu kreskowego
+barcode_y = 35 * mm  # Pozycja Y kodu kreskowego
+
+# Parametry SKU
+sku_x = 3 * mm  # Pozycja X SKU
+sku_y = barcode_y - 29 * mm  # Pozycja Y SKU - nad kodem kreskowym
+sku_font_size = 16  # Wielkość czcionki SKU
+sku_font = "Helvetica-Bold"  # Pogrubiona czcionka SKU
+
+# Parametry dla polskiego rodzaju
+nazwa_polska_rodzaje_font_size = 10  # Wielkość czcionki dla NAZWA_POLSKA_RODZAJE
+nazwa_polska_rodzaje_font = "Helvetica-Bold"  # Pogrubiona czcionka dla NAZWA_POLSKA_RODZAJE
+nazwa_polska_rodzaje_y = 32 * mm  # Pozycja Y dla NAZWA_POLSKA_RODZAJE
+
+# Parametry dla angielskiego rodzaju
+nazwa_angielska_rodzaje_font_size = 8  # Wielkość czcionki dla NAZWA_ANGIELSKA_RODZAJE
+nazwa_angielska_rodzaje_font = "Helvetica"  # Czcionka dla NAZWA_ANGIELSKA_RODZAJE
+nazwa_angielska_rodzaje_y = 29 * mm  # Pozycja Y dla NAZWA_ANGIELSKA_RODZAJE
+
+# Parametry dla Kolory_razem
+kolory_razem_font_size = 12  # Wielkość czcionki dla Kolory_razem
+kolory_razem_font = "Helvetica-Bold"  # Pogrubiona czcionka dla Kolory_razem
+kolory_razem_y = 23 * mm  # Pozycja Y dla Kolory_razem
+
+# Parametry dla Rozmiarów
+eu_x = 12 * mm  # Pozycja X dla rozmiaru EU
+eu_y = 15 * mm  # Pozycja Y dla rozmiaru EU
+eu_font_size = 18  # Wielkość czcionki dla rozmiaru EU
+eu_font = "Helvetica-Bold"  # Czcionka dla rozmiaru EU
+
+uk_x = 45 * mm  # Pozycja X dla rozmiaru UK
+uk_y = 15 * mm  # Pozycja Y dla rozmiaru UK
+uk_font_size = 6  # Wielkość czcionki dla rozmiaru UK
+uk_font = "Helvetica-Bold"  # Czcionka dla rozmiaru UK
+
+us_x = 45 * mm  # Pozycja X dla rozmiaru US
+us_y = 19 * mm  # Pozycja Y dla rozmiaru US
+us_font_size = 6  # Wielkość czcionki dla rozmiaru US
+us_font = "Helvetica-Bold"  # Czcionka dla rozmiaru US
+
+fr_x = 45 * mm  # Pozycja X dla rozmiaru FR
+fr_y = 17* mm  # Pozycja Y dla rozmiaru FR
+fr_font_size = 6  # Wielkość czcionki dla rozmiaru FR
+fr_font = "Helvetica-Bold"  # Czcionka dla rozmiaru FR
+
+it_x = 45 * mm  # Pozycja X dla rozmiaru IT
+it_y = 13 * mm  # Pozycja Y dla rozmiaru IT
+it_font_size = 6  # Wielkość czcionki dla rozmiaru IT
+it_font = "Helvetica-Bold"  # Czcionka dla rozmiaru IT
+
+# Funkcja generująca kod kreskowy
+
+# Funkcja generująca kod kreskowy
+def generate_barcode(ean, filename):
+    try:
+        ean_code = EAN13(ean, writer=ImageWriter())
+        ean_code.save(filename)
+        if os.path.exists(f"{filename}.png.png"):
+            os.rename(f"{filename}.png.png", f"{filename}.png")
+   
+    except Exception as e:
+        print(f"Błąd podczas generowania kodu kreskowego dla EAN {ean}: {e}")
+
+# Funkcja do wyszukiwania rodzaju w pliku Rodzaje.xlsx
+def find_type_values(product_type, rodzaje_df):
+    try:
+        row = rodzaje_df[rodzaje_df.iloc[:, 1].str.strip().str.lower() == product_type.strip().lower()]
+        if not row.empty:
+            typ_polski = row.iloc[0, 1]
+            typ_angielski = row.iloc[0, 2]
+            return typ_polski, typ_angielski
+        return product_type, None
+    except Exception as e:
+        return product_type, None
+
+# Funkcja do wyszukiwania wartości w pliku Kolory.xlsx
+def find_color_values(kolor_polski, kolory_df):
+    try:
+        row = kolory_df[kolory_df.iloc[:, 1].str.strip() == kolor_polski]
+        if not row.empty:
+            kolor_en = row.iloc[0, 2]
+            return kolor_polski, kolor_en
+        return kolor_polski, None
+    except Exception as e:
+        print(f"Błąd podczas wyszukiwania koloru: {e}")
+        return kolor_polski, None
+
+# Funkcja do bezpiecznej konwersji
+def safe_convert(value):
+    try:
+        return str(int(float(value))) if float(value).is_integer() else str(float(value))
+    except ValueError:
+        return str(value)
+
+# Funkcja do wyszukiwania wartości w pliku Rozmiary.xlsx
+def find_size_values(size_code, type_text, rozmiary_df):
+    try:
+        size_float = float(size_code)
+        type_text_cleaned = type_text.strip().lower()
+        rozmiary_df['Rodzaj_cleaned'] = rozmiary_df['Rodzaj'].str.strip().str.lower()
+        rozmiary_df['Size_float'] = rozmiary_df['Size'].astype(str).str.replace(',', '.').astype(float)
+
+        row = rozmiary_df[
+            (rozmiary_df['Size_float'] == size_float) &
+            (rozmiary_df['Rodzaj_cleaned'] == type_text_cleaned)
+        ]
+
+        if not row.empty:
+            rozmiar_eu = row.iloc[0]['EU']
+            rozmiar_uk = row.iloc[0]['UK']
+            rozmiar_us = row.iloc[0]['US']
+            rozmiar_fr = row.iloc[0]['FR']
+            rozmiar_it = row.iloc[0]['IT']
+            return rozmiar_eu, rozmiar_uk, rozmiar_us, rozmiar_fr, rozmiar_it
+
+        return None, None, None, None, None
+    except Exception as e:
+        print(f"Błąd podczas wyszukiwania rozmiaru: {e}")
+        return None, None, None, None, None
+
+# Funkcja do tworzenia etykiet
+def create_labels(data, kolory_df, rodzaje_df, rozmiary_df, output_pdf):
+    total_labels_created = 0
+    sku_group_count = {}
+    total_rows_processed = len(data)
+    try:
+        c = None
+
+        for index, row in data.iterrows():
+            # Pobierz wartość z kolumny, która wskazuje, ile razy utworzyć etykietę
+            label_count = int(row.iloc[9])  # Zastąp 9 indeksem kolumny z ilością etykiet
+
+            total_labels_created += label_count  # Zsumowanie etykiet
+            sku_data = str(row.iloc[2])  # Zastąp 2 indeksem kolumny z SKU
+
+            # Aktualizacja liczby etykiet zgrupowanych dla danego SKU
+            if sku_data in sku_group_count:
+                sku_group_count[sku_data] += label_count
+            else:
+                sku_group_count[sku_data] = label_count
+
+            for _ in range(label_count):
+                if c is None:
+                    c = canvas.Canvas(output_pdf, pagesize=(60 * mm, 50 * mm))
+
+                label_width = 60 * mm
+                label_height = 50 * mm
+
+                # Ścieżka do tła etykiety
+                background_image = os.path.join(script_dir, "2.png")
+                if os.path.exists(background_image):
+                    c.drawImage(background_image, 0, 0, width=label_width, height=label_height)
+
+                # Ekstrakcja i podział SKU z kolumny
+                sku_data = str(row.iloc[2])  # Zastąp 2 indeksem kolumny z SKU
+                print(f"SKU Data: {sku_data}")  # Debugowanie
+
+                if '@' in sku_data:
+                    sku_cleaned = sku_data.split('@')[0]  # Pobranie części przed @
+                    size_code_str = sku_data.split('@')[1][:3].lstrip('0')  # Pobieranie rozmiaru z SKU
+                    if size_code_str:
+                        try:
+                            size_code = float(size_code_str)
+                        except ValueError:
+                            size_code = None
+                    else:
+                        size_code = None
+                else:
+                    sku_cleaned = sku_data  # Jeśli nie ma @, używamy całego SKU
+                    size_code = None
+
+                # Wyświetlenie SKU bez rozmiaru na etykiecie
+                sku_parts = sku_cleaned
+                c.setFont(sku_font, sku_font_size)
+                c.drawString(sku_x, sku_y, sku_parts)
+
+                # Pobranie koloru po polsku z kolumny
+                kolor_polski = str(row.iloc[7]).strip()  # Zastąp 7 indeksem kolumny z kolorem
+                kolor_pl, kolor_en = find_color_values(kolor_polski, kolory_df)
+
+                kolory_razem = f"{kolor_pl} | {kolor_en}" if kolor_pl and kolor_en else "N/A"
+                c.setFont(kolory_razem_font, kolory_razem_font_size)
+                text_width = c.stringWidth(kolory_razem, kolory_razem_font, kolory_razem_font_size)
+                kolory_razem_x = (label_width - text_width) / 2
+                c.drawString(kolory_razem_x, kolory_razem_y, kolory_razem)
+
+                # Pobranie rodzaju z kolumny
+                produkt_typ_data = str(row.iloc[6]).strip()  # Zastąp 6 indeksem kolumny z rodzajem
+                typ_polski, typ_angielski = find_type_values(produkt_typ_data, rodzaje_df)
+
+                # Umieszczanie polskiej wersji rodzaju na etykiecie
+                if typ_polski:
+                    c.setFont(nazwa_polska_rodzaje_font, nazwa_polska_rodzaje_font_size)
+                    text_width_polski = c.stringWidth(typ_polski, nazwa_polska_rodzaje_font, nazwa_polska_rodzaje_font_size)
+                    nazwa_polska_rodzaje_x = (label_width - text_width_polski) / 2
+                    c.drawString(nazwa_polska_rodzaje_x, nazwa_polska_rodzaje_y, typ_polski)
+
+                # Umieszczanie angielskiej wersji rodzaju na etykiecie
+                if typ_angielski:
+                    c.setFont(nazwa_angielska_rodzaje_font, nazwa_angielska_rodzaje_font_size)
+                    text_width_angielski = c.stringWidth(typ_angielski, nazwa_angielska_rodzaje_font, nazwa_angielska_rodzaje_font_size)
+                    nazwa_angielska_rodzaje_x = (label_width - text_width_angielski) / 2
+                    c.drawString(nazwa_angielska_rodzaje_x, nazwa_angielska_rodzaje_y, typ_angielski)
+
+                # Przetwarzanie produkt_typ_data do produkt_typ
+                produkt_typ_words = produkt_typ_data.split(" ")
+
+                if len(produkt_typ_words) >= 2:
+                    produkt_typ = " ".join(produkt_typ_words[:2]).lower()
+                else:
+                    produkt_typ = produkt_typ_data.lower()
+                print(f"Produkt Typ: {produkt_typ}")
+
+                # Pobranie rozmiarów z pliku Rozmiary.xlsx na podstawie size_code i produkt_typ
+                if size_code:
+                    print(f"Size code: {size_code}, Produkt Typ: {produkt_typ}")
+                    rozmiar_eu, rozmiar_uk, rozmiar_us, rozmiar_fr, rozmiar_it = find_size_values(size_code, produkt_typ, rozmiary_df)
+
+                    # Upewnienie się, że rozmiary są renderowane, jeśli są dostępne
+                    if rozmiar_eu is not None:
+                        c.setFont(eu_font, eu_font_size)
+                        c.drawString(eu_x, eu_y, f"EU: {safe_convert(rozmiar_eu)}")
+
+                    if rozmiar_uk is not None:
+                        c.setFont(uk_font, uk_font_size)
+                        c.drawString(uk_x, uk_y, f"UK: {safe_convert(rozmiar_uk)}")
+
+                    if rozmiar_us is not None:
+                        c.setFont(us_font, us_font_size)
+                        c.drawString(us_x, us_y, f"US: {safe_convert(rozmiar_us)}")
+
+                    if rozmiar_fr is not None:
+                        c.setFont(fr_font, fr_font_size)
+                        c.drawString(fr_x, fr_y, f"FR: {safe_convert(rozmiar_fr)}")
+
+                    if rozmiar_it is not None:
+                        c.setFont(it_font, it_font_size)
+                        c.drawString(it_x, it_y, f"IT: {safe_convert(rozmiar_it)}")
+                else:
+                    print("Brak size_code, pomijam rozmiary.")
+
+                # Generowanie kodu kreskowego z kolumny EAN
+                ean_code = str(row.iloc[5]).strip()  # Zastąp 5 indeksem kolumny z EAN
+                barcode_file = os.path.join(os.getcwd(), f"barcode_{index}")
+                generate_barcode(str(ean_code), barcode_file)
+
+                barcode_image_path = f"{barcode_file}.png"
+                if os.path.exists(barcode_image_path):
+                    c.drawImage(barcode_image_path, barcode_x, barcode_y, width=barcode_width, height=barcode_height)
+
+                c.showPage()
+
+        if c:
+            c.save()  # Zapisz plik PDF, jeśli jakieś etykiety zostały utworzone
+            print(f"Etykiety zapisane do pliku {output_pdf}")
+
+    except Exception as e:
+        print(f"Błąd podczas tworzenia etykiet: {e}")
+
+    # Informacja o przetworzonych wierszach, utworzonych etykietach i zgrupowanych SKU
+    print(f"\nLiczba przetworzonych wierszy z pliku DBF: {total_rows_processed}")
+    print(f"Liczba utworzonych etykiet: {total_labels_created}")
+    print("Liczba etykiet przypisanych do każdego SKU:")
+    for sku, count in sku_group_count.items():
+        print(f"SKU: {sku} - {count} etykiet")
+
+    return total_rows_processed, total_labels_created, sku_group_count
+
+def cleanup_barcodes():
+    """Funkcja do usuwania wygenerowanych plików z kodami kreskowymi."""
+    barcode_files = glob.glob("barcode_*.png")
+    for file in barcode_files:
+        try:
+            os.remove(file)
+        except Exception as e:
+            print(f"Błąd podczas usuwania pliku {file}: {e}")
+
+# Główna część programu
+if __name__ == "__main__":
+    # Inicjalizacja okna tkinter
+    root = tk.Tk()
+    root.withdraw()  # Ukrycie głównego okna
+
+    # Otwarcie okna dialogowego do wyboru pliku (obsługa tylko Excel i DBF)
+    input_file_path = filedialog.askopenfilename(
+        title="Wybierz plik z danymi etykiet (Excel lub DBF)",
+        filetypes=[("Pliki danych", "*.xlsx *.xls *.dbf"), ("Wszystkie pliki", "*.*")]
+    )
+
+    # Wygenerowanie nazwy pliku PDF na podstawie nazwy pliku wejściowego
+    base_name = os.path.splitext(os.path.basename(input_file_path))[0]
+    output_pdf = f"{base_name}.pdf"
+
+    # Określenie rozszerzenia pliku
+    file_extension = os.path.splitext(input_file_path)[1].lower()
+
+    # Wczytanie danych z wybranego pliku (Excel lub DBF)
+    if file_extension in ['.xlsx', '.xls']:
+        # Wczytanie pliku Excel
+        etykieta_data = pd.read_excel(input_file_path, header=None)
+    elif file_extension == '.dbf':
+        # Wczytanie pliku DBF
+        dbf_table = DBF(input_file_path, load=True, encoding='cp1250')  # Ustaw odpowiednie kodowanie
+        # Konwersja do DataFrame pandas
+        etykieta_data = pd.DataFrame(iter(dbf_table))
+        # Resetowanie indeksów kolumn do liczb całkowitych
+        etykieta_data.columns = range(etykieta_data.shape[1])
+    else:
+        print("Nieobsługiwany format pliku.")
+        exit()
+
+    # Sprawdzenie, czy dane zostały wczytane
+    print("Dane etykiet:")
+    print(etykieta_data.head())
+
+    # Określenie ścieżki do folderu, w którym znajduje się skrypt
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Konstrukcja pełnych ścieżek do plików pomocniczych
+    kolory_path = os.path.join(script_dir, 'Kolory.xlsx')
+    rodzaje_path = os.path.join(script_dir, 'Rodzaje.xlsx')
+    rozmiary_path = os.path.join(script_dir, 'Rozmiary.xlsx')
+
+    # Wczytanie danych pomocniczych z plików Excel znajdujących się w bieżącym folderze
+    kolory_data = pd.read_excel(kolory_path, sheet_name='Kolory')
+    rodzaje_data = pd.read_excel(rodzaje_path, sheet_name='Rodzaje')
+    rozmiary_data = pd.read_excel(rozmiary_path, sheet_name='Rozmiary')
+
+    # Konwersja kolumn rozmiarów
+    for col in ['EU', 'UK', 'US', 'FR', 'IT']:
+        rozmiary_data[col] = rozmiary_data[col].apply(safe_convert)
+
+    # Wywołanie funkcji z użyciem zdefiniowanych parametrów
+    total_rows, total_labels, sku_group_count = create_labels(
+        etykieta_data, kolory_data, rodzaje_data, rozmiary_data, output_pdf=output_pdf
+    )
+
+    # Usunięcie plików z kodami kreskowymi po utworzeniu PDF
+    cleanup_barcodes()
