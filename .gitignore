@@ -6,6 +6,9 @@ __pycache__/
 # Tymczasowe obrazy kodow kreskowych tworzone przez skrypty
 barcode_*.png
 
+# Lokalna baza slownikow
+etykiety_slowniki.db
+
 # Artefakty lokalne
 .DS_Store
 Thumbs.db

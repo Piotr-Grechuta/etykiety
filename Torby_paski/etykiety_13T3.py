@@ -1,4 +1,5 @@
 import os
+import sys
 import pandas as pd
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
@@ -9,6 +10,15 @@ import tkinter as tk
 from tkinter import filedialog
 from dbfread import DBF
 from embedded_backgrounds import get_background_reader, has_background
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(SCRIPT_DIR)
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+from dictionary_store import load_profile_dataframes
+
+PROFILE_KEY = os.environ.get("ETYKIETY_PROFILE", "torby_paski")
 
 # Parametry kodu kreskowego
 barcode_width = 60 * mm
@@ -72,6 +82,30 @@ size_font_parameters = {
     'pasek': {
         'font_size': 16,
         'x': 7 * mm,
+        'y': 15 * mm,
+        'font': 'Helvetica-Bold',
+    },
+    'odzież damska': {
+        'font_size': 18,
+        'x': 10 * mm,
+        'y': 15 * mm,
+        'font': 'Helvetica-Bold',
+    },
+    'odziez damska': {
+        'font_size': 18,
+        'x': 10 * mm,
+        'y': 15 * mm,
+        'font': 'Helvetica-Bold',
+    },
+    'odzież męska': {
+        'font_size': 18,
+        'x': 10 * mm,
+        'y': 15 * mm,
+        'font': 'Helvetica-Bold',
+    },
+    'odziez meska': {
+        'font_size': 18,
+        'x': 10 * mm,
         'y': 15 * mm,
         'font': 'Helvetica-Bold',
     },
@@ -200,11 +234,11 @@ def create_labels(data, kolory_df, rodzaje_df, rozmiary_df, output_pdf):
 
                 # Wybór tła na podstawie rodzaju
                 if produkt_typ_data.lower().startswith("obuwie"):
-                    background_image = os.path.join(script_dir, "2.png")
+                    background_image = os.path.join(SCRIPT_DIR, "2.png")
                 elif produkt_typ_data.lower().startswith(("kurtka", "pasek")):
-                    background_image = os.path.join(script_dir, "3.png")
+                    background_image = os.path.join(SCRIPT_DIR, "3.png")
                 else:
-                    background_image = os.path.join(script_dir, "1.png")
+                    background_image = os.path.join(SCRIPT_DIR, "1.png")
 
                 # Rysowanie tla: najpierw wersja osadzona (bez zaleznosci od plikow PNG),
                 # potem fallback do pliku lokalnego.
@@ -403,18 +437,10 @@ if __name__ == "__main__":
     print("Dane etykiet:")
     print(etykieta_data.head())
 
-    # Określenie ścieżki do folderu, w którym znajduje się skrypt
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-
-    # Konstrukcja pełnych ścieżek do plików pomocniczych
-    kolory_path = os.path.join(script_dir, 'Kolory.xlsx')
-    rodzaje_path = os.path.join(script_dir, 'Rodzaje.xlsx')
-    rozmiary_path = os.path.join(script_dir, 'Rozmiary.xlsx')
-
-    # Wczytanie danych pomocniczych z plików Excel znajdujących się w bieżącym folderze
-    kolory_data = pd.read_excel(kolory_path, sheet_name='Kolory')
-    rodzaje_data = pd.read_excel(rodzaje_path, sheet_name='Rodzaje')
-    rozmiary_data = pd.read_excel(rozmiary_path, sheet_name='Rozmiary')
+    # Wczytanie danych slownikowych z bazy SQLite
+    # (automatycznie zasilanej z XLSX przy pierwszym uruchomieniu).
+    kolory_data, rodzaje_data, rozmiary_data = load_profile_dataframes(PROFILE_KEY)
+    print(f"Profil slownikow: {PROFILE_KEY}")
 
     # Konwersja kolumn rozmiarów
     for col in ['EU', 'UK', 'US', 'FR', 'IT']:

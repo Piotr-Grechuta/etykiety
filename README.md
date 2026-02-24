@@ -1,31 +1,54 @@
 # Etykiety
 
-Projekt zawiera dwa generatory etykiet PDF na podstawie danych produktowych oraz jedno okno startowe do wyboru profilu.
+Projekt zawiera generatory etykiet PDF dla trzech profili towarowych:
+- `buty`
+- `torby_paski`
+- `ubrania`
+
+oraz jedno okno startowe do wyboru profilu i zarzadzania slownikami.
 
 ## Struktura
-- `etykiety_launcher.py` - uruchamiacz z wyborem profilu (`Buty` / `Torby i paski`).
-- `buty/etykiety_14.py` - generator etykiet dla asortymentu butowego.
-- `Torby_paski/etykiety_13T3.py` - generator etykiet dla toreb, paskow i pozostalych grup.
+- `etykiety_launcher.py` - GUI startowe (wybor profilu, uruchomienie generatora, zarzadzanie listami).
+- `dictionary_store.py` - baza SQLite slownikow + import z XLSX.
+- `dictionary_manager_gui.py` - GUI do edycji list slownikowych.
+- `buty/etykiety_14.py` - generator etykiet dla profilu butowego.
+- `Torby_paski/etykiety_13T3.py` - generator etykiet dla profilu torby/paski oraz ubrania.
 
-Kazdy katalog (`buty`, `Torby_paski`) zawiera:
-- slowniki: `Kolory.xlsx`, `Rodzaje.xlsx`, `Rozmiary.xlsx`
-- osadzone tla etykiet w kodzie: `embedded_backgrounds.py`
-- kompatybilne pliki tla PNG (`1.png`, `2.png`, `3.png`) jako fallback
-- przykladowe pliki danych (`.dbf`, `.xlsx`)
+## Slowniki (od 0.4.0)
+Slowniki sa trzymane w `etykiety_slowniki.db`.
 
-## Jak to dziala (od 0.2.0)
-1. Uzytkownik uruchamia `etykiety_launcher.py` i wybiera profil.
-2. Generator otwiera okno wyboru pliku wejsciowego (`DBF` / `XLSX`).
-3. Slowniki ladowane sa z katalogu danego profilu.
-4. Etykieta PDF 60x50 mm jest skladana z danymi i kodem EAN13.
-5. Tlo etykiety jest rysowane z zasobow osadzonych (bez zaleznosci od PNG na dysku).
-6. Jesli osadzone tlo nie moze byc wczytane, generator uzywa PNG jako fallback.
+### Profile i zrodla XLSX
+- `buty`:
+  - `buty/Kolory.xlsx` (Kolory)
+  - `buty/Rodzaje.xlsx` (Rodzaje)
+  - `buty/Rozmiary.xlsx` (Rozmiary)
+- `torby_paski`:
+  - `Torby_paski/Kolory.xlsx` (Kolory)
+  - `Torby_paski/Rodzaje.xlsx` (Rodzaje)
+  - `Torby_paski/Rozmiary.xlsx` (Rozmiary)
+- `ubrania`:
+  - `ubrania/TABELA KOLORÓW.xlsx` (Kolory)
+  - `ubrania/GRUPY TOWAROWE.xlsx` (Rodzaje)
+  - `ubrania/TABELA ROZMIARÓW.xlsx` (Rozmiary)
+
+W GUI (`Zarzadzaj listami`) mozna:
+- przegladac listy,
+- dodawac/edytowac/usuwac rekordy,
+- ponownie zaimportowac dane z XLSX dla wybranego profilu.
+
+## Jak to dziala
+1. Uzytkownik uruchamia `etykiety_launcher.py`.
+2. Wybiera profil (`Buty`, `Torby i paski`, `Ubrania`).
+3. Uruchamia generator i wskazuje plik danych (`DBF` / `XLSX`).
+4. Generator laduje slowniki z SQLite.
+5. Etykieta PDF 60x50 mm jest skladana z danymi i kodem EAN13.
+6. Tlo etykiety jest rysowane z osadzonych zasobow (fallback do lokalnych PNG).
 
 ## Wymagania Python
 - `pandas`
 - `reportlab`
 - `python-barcode`
-- `Pillow` (zaleznosc writera obrazu)
+- `Pillow`
 - `dbfread`
 - `openpyxl`
 
